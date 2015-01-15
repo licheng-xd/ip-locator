@@ -145,6 +145,10 @@ public class IPv4RadixIntTree {
         logger.info("load ok, tree size: {}", size());
     }
 
+    public void prefixMerge() {
+
+    }
+
     /**
      * Puts a key-value pair in a tree, using a string representation of IPv4
      * prefix.
@@ -308,32 +312,35 @@ public class IPv4RadixIntTree {
 
     public static void main(String[] args) throws Exception {
         final IPv4RadixIntTree ipTree = IPv4RadixIntTree.getInstance();
-
-        final String ipArray[] = { "123.58.181.1", "115.236.97.158",
-            "182.140.134.24", "115.236.153.148", "114.113.197.131",
-            "115.236.153.148", "123.58.181.1", "115.236.153.148",
-            "123.58.181.58", "127.0.0.1" };
-
-        for (int i = 0; i < 1; i++) {
-            new Thread() {
-                @Override
-                public void run() {
-                    // while (true) {
-                    try {
-                        for (String ip: ipArray) {
-                            IPLocation ipl = ipTree.get(ip);
-                            System.out.println(String.format("%s [%s %s]", ip,
-                                ipl.country, ipl.area));
-                        }
-
-                        Thread.sleep(10000);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    // }
-                }
-            }.start();
-        }
+//
+//        final String ipArray[] = { "123.58.181.1", "115.236.97.158",
+//            "182.140.134.24", "115.236.153.148", "114.113.197.131",
+//            "115.236.153.148", "123.58.181.1", "115.236.153.148",
+//            "123.58.181.58", "127.0.0.1" };
+//
+//        for (int i = 0; i < 1; i++) {
+//            new Thread() {
+//                @Override
+//                public void run() {
+//                    // while (true) {
+//                    try {
+//                        for (String ip: ipArray) {
+//                            IPLocation ipl = ipTree.get(ip);
+//                            System.out.println(String.format("%s [%s %s]", ip,
+//                                ipl.country, ipl.area));
+//                        }
+//
+//                        Thread.sleep(10000);
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                    // }
+//                }
+//            }.start();
+//        }
+//        int cidr = 16;
+//        long netmask = ((1L << (32 - cidr)) - 1L) ^ 0xffffffffL;
+//        System.out.println(Long.toHexString(netmask));
     }
 
 }

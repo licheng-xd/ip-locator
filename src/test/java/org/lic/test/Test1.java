@@ -15,7 +15,7 @@ public class Test1 {
 
     @Test
     public void test() throws Exception {
-        String ip = "59.79.129.1";
+        String ip = "1.63.254.1";
         System.out.println(ipSeeker.getIPLocation(ip));
         System.out.println(ipLoactor.get(ip));
     }
