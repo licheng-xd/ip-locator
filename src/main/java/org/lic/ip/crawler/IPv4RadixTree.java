@@ -1,5 +1,6 @@
 package org.lic.ip.crawler;
 
+
 import org.lic.ip.util.IPUtil;
 
 import java.io.*;
@@ -16,7 +17,7 @@ public class IPv4RadixTree {
      * Special value that designates that there are no value stored in the key so far.
      * One can't use store value in a tree.
      */
-    public static final Data NO_VALUE = null;
+    public static final IpData NO_VALUE = null;
 
     private static final int NULL_PTR = -1;
     private static final int ROOT_PTR = 0;
@@ -25,7 +26,7 @@ public class IPv4RadixTree {
 
     private int[] rights;
     private int[] lefts;
-    private Data[] values;
+    private IpData[] values;
 
     private int allocatedSize;
     private int size;
@@ -51,7 +52,7 @@ public class IPv4RadixTree {
 
         rights = new int[this.allocatedSize];
         lefts = new int[this.allocatedSize];
-        values = new Data[this.allocatedSize];
+        values = new IpData[this.allocatedSize];
 
         size = 1;
         lefts[0] = NULL_PTR;
@@ -67,7 +68,7 @@ public class IPv4RadixTree {
      * bitmask)
      * @param value an arbitrary value that would be stored under a given key
      */
-    public void put(long key, long mask, Data value) {
+    public void put(long key, long mask, IpData value) {
         long bit = MAX_IPV4_BIT;
         int node = ROOT_PTR;
         int next = ROOT_PTR;
@@ -124,7 +125,7 @@ public class IPv4RadixTree {
         System.arraycopy(rights, 0, newRights, 0, oldSize);
         rights = newRights;
 
-        Data[] newValues = new Data[allocatedSize];
+        IpData[] newValues = new IpData[allocatedSize];
         System.arraycopy(values, 0, newValues, 0, oldSize);
         values = newValues;
     }
@@ -136,9 +137,9 @@ public class IPv4RadixTree {
      * @return value at most specific IPv4 network in a tree for a given IPv4
      * address
      */
-    public Data selectValue(long key) {
+    public IpData selectValue(long key) {
         long bit = MAX_IPV4_BIT;
-        Data value = NO_VALUE;
+        IpData value = NO_VALUE;
         int node = ROOT_PTR;
 
         while (node != NULL_PTR) {
@@ -156,9 +157,9 @@ public class IPv4RadixTree {
      * @param ipNet IPv4 network as a string in form of "a.b.c.d/e", where a, b, c, d
      * are IPv4 octets (in decimal) and "e" is a netmask in CIDR notation
      * @param value an arbitrary value that would be stored under a given key
-     * @throws UnknownHostException
+     * @throws java.net.UnknownHostException
      */
-    public void put(String ipNet, Data value) throws UnknownHostException {
+    public void put(String ipNet, IpData value) throws UnknownHostException {
         int pos = ipNet.indexOf('/');
         String ipStr = ipNet.substring(0, pos);
         long ip = inet_aton(ipStr);
@@ -176,9 +177,9 @@ public class IPv4RadixTree {
      * @param ipStr IPv4 address to look up, in string form (i.e. "a.b.c.d")
      * @return value at most specific IPv4 network in a tree for a given IPv4
      * address
-     * @throws UnknownHostException
+     * @throws java.net.UnknownHostException
      */
-    public Data selectValue(String ipStr) throws UnknownHostException {
+    public IpData selectValue(String ipStr) throws UnknownHostException {
         return selectValue(inet_aton(ipStr));
     }
 
@@ -187,19 +188,20 @@ public class IPv4RadixTree {
      * (IPv4 net => value)
      * @param filename name of a local file to read
      * @return a fully constructed IPv4 radix tree from that file
-     * @throws IOException
+     * @throws java.io.IOException
      */
     public void loadFromLocalFile(String filename) throws IOException {
         IPv4RadixTree tr = new IPv4RadixTree(countLinesInLocalFile(filename));
         BufferedReader br = new BufferedReader(new FileReader(filename));
         String l;
-        Data value;
+        IpData value;
         //["country", "province", "city", "isp", "ip", "ip_amount"]
         while ((l = br.readLine()) != null) {
             String[] c = l.split(";");
             //1.0.0.0/24;澳大利亚;;;;223.255.255.111;256
             //1.0.1.0/24;中国;福建省;福州市;电信;1.0.1.53;256
-            value = new Data();
+            value = new IpData();
+            value.setNetwork(c[0]);
             value.setCountry(c[1]);
             value.setProvince(c[2]);
             value.setCity(c[3]);
@@ -238,46 +240,80 @@ public class IPv4RadixTree {
     public void writeRawToFile(String filename) throws IOException {
 
         OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(new File(filename)), "UTF-8");
-        for (Data data : values) {
-            if (data != null) {
-                writer.write(data.toFileString() + "\n");
+        TreeSet<IpData> valuesTree = new TreeSet<IpData>();
+        for (IpData ipData : values) {
+            if (ipData != null) {
+                valuesTree.add(ipData);
+            }
+        }
+        for (IpData ipData : valuesTree) {
+            if (ipData != null) {
+                writer.write(ipData.toFileString() + "\n");
+                System.out.println(ipData.toFileString());
             }
         }
         writer.close();
     }
 
-    public void merge() {
-        Deque<Data> mergedDeque = new ArrayDeque<Data>();
-        Deque<Data> tmpDeque = new ArrayDeque<Data>();
-        for (Data data : values) {
-            if (data == null) continue;
-            data.setIpAmount(IPUtil.getAmount(data.getNetwork()));
+    public void merge() throws UnknownHostException {
+        Deque<IpData> mergedDeque = new ArrayDeque<IpData>();
+        Deque<IpData> tmpDeque = new ArrayDeque<IpData>();
+        for (IpData ipData : values) {
+            if (ipData == null) continue;
+            ipData.setIpAmount(IPUtil.getAmount(ipData.getNetwork()));
             if (!tmpDeque.isEmpty()) {
-                Data pdata = tmpDeque.peekLast();
-                if (data.equals(pdata) || (data.getCountry().equals("中国") && data.getCountry().equals(pdata.getCountry()))) {
+                IpData pdata = tmpDeque.peekLast();
+                if (ipData.equals(pdata) || (!ipData.getCountry().equals("中国") && ipData
+                    .getCountry().equals(pdata.getCountry()))) {
                     // 相同
-                    tmpDeque.addLast(data);
+                    tmpDeque.addLast(ipData);
                 } else {
                     // 不同，合并tmpDeque，写入mergedDeque
-                    Data first = tmpDeque.peekFirst().copy();
+                    IpData first = tmpDeque.peekFirst().copy();
                     List<String> tmpCidrs = new ArrayList<String>();
-                    for (Data d : tmpDeque) {
+                    for (IpData d : tmpDeque) {
                         tmpCidrs.add(d.getNetwork());
                     }
                     List<String> mergedCidrs = IPUtil.mergeCidrs(tmpCidrs);
                     for (String cidr : mergedCidrs) {
-                        Data d = first.copy();
+                        IpData d = first.copy();
                         d.setNetwork(cidr);
+                        d.setIpAmount(IPUtil.getAmount(cidr));
                         mergedDeque.addLast(d);
                     }
+                    tmpDeque.clear();
+                    tmpDeque.add(ipData);
                 }
             } else {
-                tmpDeque.addLast(data);
+                tmpDeque.addLast(ipData);
             }
         }
-
-        for (Data d : mergedDeque) {
-            System.out.println(d.toFileString());
+        if (tmpDeque.size() > 0) {
+            IpData first = tmpDeque.peekFirst().copy();
+            List<String> tmpCidrs = new ArrayList<String>();
+            for (IpData d : tmpDeque) {
+                tmpCidrs.add(d.getNetwork());
+            }
+            List<String> mergedCidrs = IPUtil.mergeCidrs(tmpCidrs);
+            for (String cidr : mergedCidrs) {
+                IpData d = first.copy();
+                d.setNetwork(cidr);
+                d.setIpAmount(IPUtil.getAmount(cidr));
+                mergedDeque.addLast(d);
+            }
+            tmpDeque.clear();
         }
+
+        init(1024);
+        for (IpData ipData : mergedDeque) {
+            put(ipData.getNetwork(), ipData);
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        IPv4RadixTree tree = new IPv4RadixTree();
+        tree.loadFromLocalFile("/Users/lc/github/ipdb_creator/output/delegated-fn-original");
+        tree.merge();
+        tree.writeRawToFile("/Users/lc/github/ipdb_creator/output/delegated-fn-merged");
     }
 }

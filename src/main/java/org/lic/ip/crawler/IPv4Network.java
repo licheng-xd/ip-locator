@@ -9,223 +9,166 @@ import java.util.List;
  * Created by lc on 15/1/9.
  */
 public class IPv4Network {
-    int baseIPnumeric;
+    long baseIPnumeric; // 起始ip
 
-    int netmaskNumeric;
+    int netmaskNumeric;  // 掩码 netmask
 
-    int numericCIDR;
-
-    public IPv4Network(int ip, int prefixlen) throws NumberFormatException {
-        String IPinCIDRFormat = IPUtil.convertIntIpToString(ip) + "/" + prefixlen;
-        String[] st = IPinCIDRFormat.split("\\/");
-        if (st.length != 2)
-
-            throw new NumberFormatException("Invalid CIDR format '"
-                + IPinCIDRFormat + "', should be: xx.xx.xx.xx/xx");
-
-        String symbolicIP = st[0];
-        String symbolicCIDR = st[1];
-
-        Integer numericCIDR = new Integer(symbolicCIDR);
-        if (numericCIDR > 32)
-
-            throw new NumberFormatException("CIDR can not be greater than 32");
-
-        /* IP */
-        st = symbolicIP.split("\\.");
-
-        if (st.length != 4)
-            throw new NumberFormatException("Invalid IP address: " + symbolicIP);
-
-        int i = 24;
-        baseIPnumeric = 0;
-
-        for (int n = 0; n < st.length; n++) {
-
-            int value = Integer.parseInt(st[n]);
-
-            if (value != (value & 0xff)) {
-
-                throw new NumberFormatException("Invalid IP address: "
-                    + symbolicIP);
-            }
-
-            baseIPnumeric += value << i;
-            i -= 8;
-
-        }
-
-        /* netmask from CIDR */
-        if (numericCIDR < 8)
-            throw new NumberFormatException(
-                "Netmask CIDR can not be less than 8");
-        netmaskNumeric = 0xffffffff;
-        netmaskNumeric = netmaskNumeric << (32 - numericCIDR);
-        this.numericCIDR = numericCIDR;
-    }
+    int numericCIDR; // cidr
 
     /**
-     * Specify IP in CIDR format like: new IPv4("10.1.0.25/16");
+     * i.e. IPv4Network("1.1.1.0/24");
      *
      * @param IPinCIDRFormat
      */
     public IPv4Network(String IPinCIDRFormat) throws NumberFormatException {
 
-        String[] st = IPinCIDRFormat.split("\\/");
-        if (st.length != 2)
-
+        String[] st = IPinCIDRFormat.split("/");
+        if (st.length != 2) {
             throw new NumberFormatException("Invalid CIDR format '"
                 + IPinCIDRFormat + "', should be: xx.xx.xx.xx/xx");
-
+        }
         String symbolicIP = st[0];
         String symbolicCIDR = st[1];
 
         Integer numericCIDR = new Integer(symbolicCIDR);
-        if (numericCIDR > 32)
+        if (numericCIDR > 32) {
+            throw new NumberFormatException("CIDR can not be greater than 32: " + IPinCIDRFormat);
+        }
 
-            throw new NumberFormatException("CIDR can not be greater than 32");
-
-        /* IP */
         st = symbolicIP.split("\\.");
-
-        if (st.length != 4)
-            throw new NumberFormatException("Invalid IP address: " + symbolicIP);
+        if (st.length != 4) {
+            throw new NumberFormatException("Invalid IP address: " + IPinCIDRFormat);
+        }
 
         int i = 24;
         baseIPnumeric = 0;
-
         for (int n = 0; n < st.length; n++) {
-
             int value = Integer.parseInt(st[n]);
-
             if (value != (value & 0xff)) {
-
-                throw new NumberFormatException("Invalid IP address: "
-                    + symbolicIP);
+                throw new NumberFormatException("Invalid IP address: " + IPinCIDRFormat);
             }
-
             baseIPnumeric += value << i;
             i -= 8;
-
         }
 
         /* netmask from CIDR */
-        if (numericCIDR < 8)
-            throw new NumberFormatException(
-                "Netmask CIDR can not be less than 8");
+        if (numericCIDR < 8) {
+            throw new NumberFormatException("Netmask CIDR can not be less than 8: " + IPinCIDRFormat);
+        }
         netmaskNumeric = 0xffffffff;
         netmaskNumeric = netmaskNumeric << (32 - numericCIDR);
         this.numericCIDR = numericCIDR;
     }
 
     /**
-     * Get the IP in symbolic form, i.e. xxx.xxx.xxx.xxx
+     * i.e. IPv4Network(16843008, 24);
+     *
+     * @param ip
+     * @param prefixlen
+     * @throws NumberFormatException
+     */
+    public IPv4Network(long ip, int prefixlen) throws NumberFormatException {
+
+        if (prefixlen > 32 || prefixlen < 8) {
+            throw new NumberFormatException("CIDR can not be >32 or <8 " + prefixlen);
+        }
+
+        baseIPnumeric = ip;
+        netmaskNumeric = 0xffffffff;
+        netmaskNumeric = netmaskNumeric << (32 - prefixlen);
+        this.numericCIDR = prefixlen;
+    }
+
+    /**
+     * 起始ip i.e. xxx.xxx.xxx.xxx
      *
      * @return
      */
-    public String getIP() {
-        return convertNumericIpToSymbolic(baseIPnumeric);
-
+    public String getStartIP() {
+        return IPUtil.ipLong2String(baseIPnumeric);
     }
 
+    /**
+     * int型ip转为string型
+     *
+     * @param ip
+     * @return
+     */
     private String convertNumericIpToSymbolic(Integer ip) {
         StringBuffer sb = new StringBuffer(15);
-
         for (int shift = 24; shift > 0; shift -= 8) {
-
-            // process 3 bytes, from high order byte down.
             sb.append(Integer.toString((ip >>> shift) & 0xff));
-
             sb.append('.');
         }
         sb.append(Integer.toString(ip & 0xff));
-
         return sb.toString();
     }
 
     /**
-     * Get the net mask in symbolic form, i.e. xxx.xxx.xxx.xxx
+     * 获取子网掩码 i.e. 255.255.255.0
      *
      * @return
      */
-
     public String getNetmask() {
         StringBuffer sb = new StringBuffer(15);
-
         for (int shift = 24; shift > 0; shift -= 8) {
-
-            // process 3 bytes, from high order byte down.
-            sb.append(Integer.toString((netmaskNumeric >>> shift) & 0xff));
-
+            sb.append(Long.toString((netmaskNumeric >>> shift) & 0xff));
             sb.append('.');
         }
-        sb.append(Integer.toString(netmaskNumeric & 0xff));
-
+        sb.append(Long.toString(netmaskNumeric & 0xff));
         return sb.toString();
     }
 
     /**
-     * Get the IP and netmask in CIDR form, i.e. xxx.xxx.xxx.xxx/xx
+     * 包含CIDR的IP  i.e. 1.1.1.0/24
      *
      * @return
      */
-
     public String getCIDR() {
         int i;
         for (i = 0; i < 32; i++) {
-
             if ((netmaskNumeric << i) == 0)
                 break;
-
         }
-        return convertNumericIpToSymbolic(baseIPnumeric & netmaskNumeric) + "/"
+        return IPUtil.ipLong2String(baseIPnumeric & netmaskNumeric) + "/"
             + i;
     }
 
+    // CIDR数值
     public int getMasklen() {
         return this.numericCIDR;
     }
 
     /**
-     * Get an arry of all the IP addresses available for the IP and netmask/CIDR
-     * given at initialization
+     * 有效IPs
      *
      * @return
      */
     public List<String> getAvailableIPs(Integer numberofIPs) {
-
         ArrayList<String> result = new ArrayList<String>();
         int numberOfBits;
-
         for (numberOfBits = 0; numberOfBits < 32; numberOfBits++) {
-
             if ((netmaskNumeric << numberOfBits) == 0)
                 break;
-
         }
+
         Integer numberOfIPs = 0;
         for (int n = 0; n < (32 - numberOfBits); n++) {
-
             numberOfIPs = numberOfIPs << 1;
             numberOfIPs = numberOfIPs | 0x01;
-
         }
 
-        Integer baseIP = baseIPnumeric & netmaskNumeric;
-
+        Long baseIP = baseIPnumeric & netmaskNumeric;
         for (int i = 1; i < (numberOfIPs) && i < numberofIPs; i++) {
-
-            Integer ourIP = baseIP + i;
-
-            String ip = convertNumericIpToSymbolic(ourIP);
-
+            Long ourIP = baseIP + i;
+            String ip = IPUtil.ipLong2String(ourIP);
             result.add(ip);
         }
         return result;
     }
 
     /**
-     * Range of hosts
+     * IP范围 i.e. 1.1.1.1 - 1.1.1.255
      *
      * @return
      */
@@ -233,41 +176,29 @@ public class IPv4Network {
 
         int numberOfBits;
         for (numberOfBits = 0; numberOfBits < 32; numberOfBits++) {
-
             if ((netmaskNumeric << numberOfBits) == 0)
                 break;
         }
         Integer numberOfIPs = 0;
         for (int n = 0; n < (32 - numberOfBits); n++) {
-
             numberOfIPs = numberOfIPs << 1;
             numberOfIPs = numberOfIPs | 0x01;
-
         }
 
-        Integer baseIP = baseIPnumeric & netmaskNumeric;
-        String firstIP = convertNumericIpToSymbolic(baseIP + 1);
-        String lastIP = convertNumericIpToSymbolic(baseIP + numberOfIPs - 1);
+        Long baseIP = baseIPnumeric & netmaskNumeric;
+        String firstIP = IPUtil.ipLong2String(baseIP + 1);
+        String lastIP = IPUtil.ipLong2String(baseIP + numberOfIPs - 1);
         return firstIP + " - " + lastIP;
     }
 
+    /**
+     * ip范围
+     *
+     * @return
+     */
     public IPRange getIPRange() {
-        int numberOfBits;
-        for (numberOfBits = 0; numberOfBits < 32; numberOfBits++) {
-
-            if ((netmaskNumeric << numberOfBits) == 0)
-                break;
-        }
-        Integer numberOfIPs = 0;
-        for (int n = 0; n < (32 - numberOfBits); n++) {
-
-            numberOfIPs = numberOfIPs << 1;
-            numberOfIPs = numberOfIPs | 0x01;
-
-        }
-
-        Integer baseIP = baseIPnumeric & netmaskNumeric;
-        return new IPRange(baseIP, baseIP + numberOfIPs, getCIDR());
+        long endIP = baseIPnumeric + (1<<(32 - numericCIDR));
+        return new IPRange(baseIPnumeric, endIP, getCIDR());
     }
 
     public List<String> getSubnet(int cdir) {
@@ -275,10 +206,10 @@ public class IPv4Network {
             throw new NumberFormatException("CIDR can not be greater than 32");
         }
         int numberOfIPs = (int) Math.pow(2, 32 - cdir);
-        Integer baseIP = baseIPnumeric & netmaskNumeric;
+        Long baseIP = baseIPnumeric & netmaskNumeric;
         List<String> list = new ArrayList<String>();
         for (int i=0; i<Math.pow(2, cdir-numericCIDR); i++) {
-            String subnet = convertNumericIpToSymbolic(baseIP) + "/" + cdir;
+            String subnet = IPUtil.ipLong2String(baseIP) + "/" + cdir;
             baseIP += numberOfIPs;
             list.add(subnet);
         }
@@ -315,17 +246,17 @@ public class IPv4Network {
      */
 
     public String getWildcardMask() {
-        Integer wildcardMask = netmaskNumeric ^ 0xffffffff;
+        int wildcardMask = netmaskNumeric ^ 0xffffffff;
 
         StringBuffer sb = new StringBuffer(15);
         for (int shift = 24; shift > 0; shift -= 8) {
 
             // process 3 bytes, from high order byte down.
-            sb.append(Integer.toString((wildcardMask >>> shift) & 0xff));
+            sb.append(Long.toString((wildcardMask >>> shift) & 0xff));
 
             sb.append('.');
         }
-        sb.append(Integer.toString(wildcardMask & 0xff));
+        sb.append(Long.toString(wildcardMask & 0xff));
 
         return sb.toString();
 
@@ -350,15 +281,15 @@ public class IPv4Network {
             numberOfIPs = numberOfIPs | 0x01;
         }
 
-        Integer baseIP = baseIPnumeric & netmaskNumeric;
-        Integer ourIP = baseIP + numberOfIPs;
+        Long baseIP = baseIPnumeric & netmaskNumeric;
+        Long ourIP = baseIP + numberOfIPs;
 
-        String ip = convertNumericIpToSymbolic(ourIP);
+        String ip = IPUtil.ipLong2String(ourIP);
 
         return ip;
     }
 
-    private String getBinary(Integer number) {
+    private String getBinary(int number) {
         String result = "";
 
         Integer ourMaskBitPattern = 1;
@@ -423,9 +354,9 @@ public class IPv4Network {
 
     public boolean contains(IPv4Network child) {
 
-        Integer subnetID = child.baseIPnumeric;
+        Long subnetID = child.baseIPnumeric;
 
-        Integer subnetMask = child.netmaskNumeric;
+        int subnetMask = child.netmaskNumeric;
 
         if ((subnetID & this.netmaskNumeric) == (this.baseIPnumeric & this.netmaskNumeric)) {
 

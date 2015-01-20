@@ -1,6 +1,5 @@
 package org.lic.ip.crawler;
 
-import javax.xml.datatype.Duration;
 import java.util.Queue;
 
 /**

@@ -76,7 +76,7 @@ public class IPv4RadixIntTree {
 
         try {
             String filepath = getClass().getClassLoader()
-                .getResource("ip_location.txt").getPath();
+                .getResource("ipdb_all_2015-01-19").getPath();
 
             int lines = countLinesInLocalFile(filepath);
             logger.info("file lines: {}", lines);

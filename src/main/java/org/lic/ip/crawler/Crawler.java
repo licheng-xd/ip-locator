@@ -11,6 +11,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 /**
  * Created by lc on 15/1/8.
@@ -22,18 +25,142 @@ public class Crawler {
 
     private LimitRate limitRate = new LimitRate(1000L, 10);
 
-    private IPv4RadixTree oldTree = new IPv4RadixTree();
+    private static String cn_delegated = "delegated-apnic-test";
 
-    private IPv4RadixTree newTree = new IPv4RadixTree();
+    private static String CN_OUT_ORIGINAL = "delegated-cn-original";
 
-    private static String INPUT = "/Users/lc/github/ipdb_creator/input/delegated-apnic-test";
+    private static String FN_OUT_ORIGINAL = "delegated-fn-original";
 
-    private static String OUTPUT = "/Users/lc/github/ipdb_creator/output/delegated-cn-original";
+    private static String CN_OUT_MERGED = "delegated-cn-merged";
 
-    public void scanCNIP() {
+    private static String FN_OUT_MERGED = "delegated-fn-merged";
+
+    private static String IN_PATH = "input/";
+
+    private static String OUT_PATH = "output/";
+
+    private static String[] all_delegated = {"delegated-afrinic-latest","delegated-apnic-latest",
+        "delegated-arin-latest", "delegated-lacnic-latest", "delegated-ripencc-latest"};
+
+    private static Map<String, String> countryCode = new HashMap<String, String>();
+
+    private static Map<String, LinkedList<IPv4Network>> dict = new HashMap<String, LinkedList<IPv4Network>>();
+
+    private static LinkedList<IPv4Network> availableIPs = new LinkedList<IPv4Network>();
+
+    public IPv4RadixTree scanFNIP() {
+        IPv4RadixTree fnTree = new IPv4RadixTree();
+        BufferedReader reader = null;
         try {
-            BufferedReader reader = new BufferedReader(
-                new FileReader(new File(INPUT)));
+            // load country code
+            reader = new BufferedReader(
+                new FileReader(new File(IN_PATH + "country_code")));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] sp = line.split(" ");
+                countryCode.put(sp[0].trim(), sp[1].trim());
+            }
+            reader.close();
+
+            for (String file : all_delegated) {
+                reader = new BufferedReader(
+                    new FileReader(new File(IN_PATH + file)));
+                while ((line = reader.readLine()) != null) {
+                    String[] params = line.split("\\|");
+
+                    if (params.length >= 4
+                        && params[2].equals("ipv4")
+                        && !params[3].equals("*")
+                        && !params[1].equals("CN")) {
+                        long startIP = IPUtil.ipString2Long(params[3]);
+                        long endIP = startIP + Integer.parseInt(params[4]);
+                        logger.info(startIP + " " + endIP + " " + Integer
+                            .parseInt(params[4]));
+                        IPRange ipRange = new IPRange(startIP, endIP);
+                        ipRange.prefixlen = IPUtil.getSmallestMasklen(Integer.parseInt(params[4]));
+                        if (params[1].equals("")) {
+                            availableIPs.addAll(IPUtil.iprangeToCidrs(ipRange));
+                        } else {
+                            if (dict.containsKey(params[1])) {
+                                LinkedList<IPv4Network> lst = dict.get(params[1]);
+                                lst.addAll(IPUtil.iprangeToCidrs(ipRange));
+                                dict.put(params[1], lst);
+                            } else {
+                                dict.put(params[1], IPUtil.iprangeToCidrs(ipRange));
+                            }
+                        }
+                    }
+                }
+            }
+            System.out.println("finish read");
+
+            for (String key : dict.keySet()) {
+                IPv4Network net = dict.get(key).getLast();
+                String randomIP = IPUtil
+                    .getRandomIp(net.getCIDR().split("/")[0], net.getMasklen());
+                for (IPv4Network network : dict.get(key)) {
+                    IpData ipData = new IpData();
+                    ipData.setNetwork(network.getCIDR());
+                    ipData.setCountry(countryCode.get(key));
+                    ipData.setProvince("");
+                    ipData.setCity("");
+                    ipData.setIsp("");
+                    ipData.setIp(randomIP);
+                    ipData.setIpAmount(IPUtil.getAmount(network.getCIDR()));
+                    fnTree.put(network.getCIDR(), ipData);
+                }
+            }
+
+            for (IPv4Network network : availableIPs) {
+                String randomIP = IPUtil
+                    .getRandomIp(network.getCIDR().split("/")[0],
+                        network.getMasklen());
+                IpData ipData = null;
+                System.out.println("query ip " + network.getCIDR());
+                if (ipData == null) {
+                    while (ipData == null) {
+                        try {
+                            ipData = queryFromTaobao(randomIP);
+                        } catch (Exception e) {
+                            logger.error(
+                                "queryFromTaobao exception: " + e
+                                    .getMessage(), e);
+                        }
+                    }
+                }
+                ipData.setIpAmount(IPUtil.getAmount(network.getCIDR()));
+                ipData.setNetwork(network.getCIDR());
+                fnTree.put(network.getCIDR(), ipData);
+            }
+
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            e.printStackTrace();
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                fnTree.writeRawToFile(OUT_PATH + FN_OUT_ORIGINAL);
+                fnTree.merge();
+                fnTree.writeRawToFile(OUT_PATH + FN_OUT_MERGED);
+            } catch (IOException e) {
+                logger.error(e.getMessage(), e);
+            }
+        }
+        return fnTree;
+    }
+
+    public IPv4RadixTree scanCNIP() {
+        IPv4RadixTree cnTree = new IPv4RadixTree();
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(
+                new FileReader(new File(IN_PATH + cn_delegated)));
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] params = line.split("\\|");
@@ -56,11 +183,11 @@ public class Crawler {
                         String masklen = subnet.split("/")[1];
                         String randomIP = IPUtil
                             .getRandomIp(startIP, Integer.parseInt(masklen));
-                        Data data = oldTree.selectValue(randomIP);
-                        if (data == null) {
-                            while (data == null) {
+                        IpData ipData = null;
+                        if (ipData == null) {
+                            while (ipData == null) {
                                 try {
-                                    data = queryFromTaobao(randomIP);
+                                    ipData = queryFromTaobao(randomIP);
                                 } catch (Exception e) {
                                     logger.error(
                                         "queryFromTaobao exception: " + e
@@ -68,27 +195,35 @@ public class Crawler {
                                 }
                             }
                         }
-                        data.setIpAmount(amount);
-                        data.setNetwork(subnet);
-                        logger.info(data.toFileString());
-                        newTree.put(subnet, data);
+                        ipData.setIpAmount(amount);
+                        ipData.setNetwork(subnet);
+                        logger.info(ipData.toFileString());
+                        cnTree.put(subnet, ipData);
                     }
                 }
             }
-            reader.close();
-
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
             try {
-                newTree.writeRawToFile(OUTPUT);
+                cnTree.writeRawToFile(OUT_PATH + CN_OUT_ORIGINAL);
+                cnTree.merge();
+                cnTree.writeRawToFile(OUT_PATH + CN_OUT_MERGED);
             } catch (IOException e) {
                 logger.error(e.getMessage(), e);
             }
         }
+        return cnTree;
     }
 
-    private Data queryFromTaobao(String ip) throws Exception {
+    private IpData queryFromTaobao(String ip) throws Exception {
         while (!limitRate.check()) {
             Thread.sleep(100);
         }
@@ -101,13 +236,13 @@ public class Crawler {
             JSONObject json = JSON.parseObject(ret);
             if (json.getInteger("code") == 0) {
                 JSONObject dataJson = json.getJSONObject("data");
-                Data data = new Data();
-                data.setCountry(dataJson.getString("country"));
-                data.setProvince(dataJson.getString("region"));
-                data.setCity(dataJson.getString("city"));
-                data.setIsp(dataJson.getString("isp"));
-                data.setIp(ip);
-                return data;
+                IpData ipData = new IpData();
+                ipData.setCountry(dataJson.getString("country"));
+                ipData.setProvince(dataJson.getString("region"));
+                ipData.setCity(dataJson.getString("city"));
+                ipData.setIsp(dataJson.getString("isp"));
+                ipData.setIp(ip);
+                return ipData;
             } else {
                 return null;
             }
@@ -120,16 +255,20 @@ public class Crawler {
 
     public static void main(String[] args) throws Exception {
         if (args.length > 1) {
-            INPUT = args[0];
-            OUTPUT = args[1];
-            new Crawler().scanCNIP();
+            IN_PATH = args[0];
+            OUT_PATH = args[1];
+            Crawler crawler = new Crawler();
+            crawler.scanCNIP();
+            crawler.scanFNIP();
+            IPv4RadixTree retTree = new IPv4RadixTree();
+            retTree.loadFromLocalFile(OUT_PATH + FN_OUT_MERGED);
+            retTree.loadFromLocalFile(OUT_PATH + CN_OUT_MERGED);
+            retTree.merge();
+            retTree.writeRawToFile(OUT_PATH + "ipdb.dat");
+            logger.info("finish");
         } else {
             System.out.println("miss param, abandon !!!");
             System.exit(1);
         }
-//        Crawler crawler = new Crawler();
-//        for (int i=0; i<100; i++) {
-//            System.out.println(crawler.queryFromTaobao(i + "."));
-//        }
     }
 }

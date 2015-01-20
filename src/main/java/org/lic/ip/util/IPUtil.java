@@ -48,6 +48,27 @@ public class IPUtil {
         return sb.toString();
     }
 
+    public static int convertStringIpToInt(String ip) {
+//        String[] ss = ip.split("\\.");
+//        if (ss.length != 4) {
+//            return -1;
+//        }
+//        int ret = 0;
+//        for (int i=0; i<4; i++) {
+//            ret = ret << 8 | Integer.parseInt(ss[i]);
+//        }
+//        return ret;
+        String[] ss = ip.split("\\.");
+        if (ss.length != 4) {
+            return -1;
+        }
+        long ret = 0;
+        for (int i=0; i<4; i++) {
+            ret = ret << 8 | Integer.parseInt(ss[i]);
+        }
+        return (int)ret;
+    }
+
     public static String getRandomIp(long netWork) {
         int tmp = random.nextInt(255);
         return ipLong2String(netWork + tmp);
@@ -66,6 +87,26 @@ public class IPUtil {
     public static String getRandomIp(String baseIP, int masklen) {
         int tmp = Math.abs(random.nextInt((1<<(32-masklen)) -1));
         return ipLong2String(ipString2Long(baseIP) + tmp);
+    }
+
+    public static int getSmallestMasklen(int amount) {
+//        int i = 0;
+//        while (Math.pow(2, i) != amount) {
+//            if (Math.pow(2, i) < amount) {
+//                i++;
+//            } else {
+//                amount = amount - (int)Math.pow(2, i-1);
+//                i = 0;
+//            }
+//        }
+//        return 32 - i;
+        int i = 1;
+        int ret = 0;
+        while ((i&amount) == 0) {
+            i = i<<1;
+            ret++;
+        }
+        return 32 - ret;
     }
 
     public static LinkedList<String> mergeCidrs(List<String> cidrs) {
@@ -101,10 +142,12 @@ public class IPUtil {
     }
 
     public static LinkedList<IPv4Network> iprangeToCidrs(IPRange range) {
+        if (range.prefixlen < 8 || range.prefixlen > 32) {
+            range.prefixlen = 24;
+        }
         LinkedList<IPv4Network> cidrList = new LinkedList<IPv4Network>();
         IPv4Network spanCidr = spanningCidr(range.start, range.end,
             range.prefixlen);
-
         if (spanCidr.getIPRange().start < range.start) {
             IPv4Network exclude = new IPv4Network(range.start, range.prefixlen);
             cidrList = cidrPartition(spanCidr, exclude).get(2);
@@ -119,13 +162,24 @@ public class IPUtil {
         return cidrList;
     }
 
-    public static IPv4Network spanningCidr(int start, int end, int prefixlen) {
-        int ipnum = end;
-        while (prefixlen > 0 && ipnum > start) {
-            prefixlen--;
-            ipnum &= -(1<<(32 - prefixlen));
+    public static IPv4Network spanningCidr(long start, long end, int prefixlen) {
+        if (start == 704380928) {
+            System.out.println("debug");
         }
-        return new IPv4Network(convertIntIpToString(ipnum) + "/" + prefixlen);
+        //int prefixlen = 24;
+//        int ipnum = end; //- (1<<(32 - prefixlen));
+//        while (prefixlen > 0 && ipnum > start) {
+//            prefixlen--;
+//            ipnum &= -(1<<(32-prefixlen));
+//            //ipnum = ipnum - (1<<(32 - prefixlen));
+//        }
+//        if (prefixlen < 8 || prefixlen > 32) {
+//            System.out.println("debug");
+//        }
+        while (end - start > (1<<(32-prefixlen))) {
+            prefixlen--;
+        }
+        return new IPv4Network(end - (1<<(32-prefixlen)), prefixlen);
     }
 
     public static LinkedList<LinkedList<IPv4Network>> cidrPartition(IPv4Network target, IPv4Network exclude) {
@@ -157,10 +211,10 @@ public class IPUtil {
         }
 
         int newPrefixlen = target.getMasklen() + 1;
-        int targetStart = target.getIPRange().start;
-        int i_lower = targetStart;
-        int i_upper = targetStart + (1 << (32 - newPrefixlen));
-        int matched;
+        long targetStart = target.getIPRange().start;
+        long i_lower = targetStart;
+        long i_upper = targetStart + (1 << (32 - newPrefixlen));
+        long matched;
         while (exclude.getMasklen() >= newPrefixlen) {
             if (exclude.getIPRange().start > i_upper) {
                 left.add(new IPv4Network(i_lower, newPrefixlen));
@@ -187,12 +241,18 @@ public class IPUtil {
     }
 
     public static void main(String[] args) throws Exception {
-        BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/lc/github/ipdb_creator/output/cn-original")));
-        List<String> cidrs = new ArrayList<String>();
-        String line;
-        while((line = reader.readLine()) != null) {
-            cidrs.add(line.split(";")[0]);
-        }
-        System.out.println(mergeCidrs(cidrs));
+//        BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/lc/github/ipdb_creator/output/cn-original")));
+//        List<String> cidrs = new ArrayList<String>();
+//        String line;
+//        while((line = reader.readLine()) != null) {
+//            cidrs.add(line.split(";")[0]);
+//        }
+//        System.out.println(mergeCidrs(cidrs));
+        //System.out.println(getSmallestMasklen(1024));
+        System.out.println(convertIntIpToString(704643072));
+        System.out.println(ipString2Long("168.209.0.0"));
+//        int ip = 704643072;
+//        ip &= -(1<<(32-19));
+//        System.out.println(ip);
     }
 }

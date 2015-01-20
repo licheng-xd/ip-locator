@@ -5,30 +5,30 @@ package org.lic.ip.crawler;
  */
 public class IPRange implements Comparable<IPRange> {
 
-    public IPRange(int start, int end) {
+    public IPRange(long start, long end) {
         this.start = start;
         this.end = end;
     }
 
-    public IPRange(int start, int end, String cidr) {
+    public IPRange(long start, long end, String cidr) {
         this.start = start;
         this.end = end;
         this.cidr = cidr;
     }
 
-    public int start;
+    public long start;
 
-    public int end;
+    public long end;
 
     public String cidr;
 
     public int prefixlen;
 
     @Override public int compareTo(IPRange ipRange) {
-        int ret = start - ipRange.start;
+        long ret = start - ipRange.start;
         if (ret != 0)
-            return ret;
+            return (int)ret;
         else
-            return ipRange.end - end;
+            return (int) (ipRange.end - end);
     }
 }

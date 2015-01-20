@@ -1,9 +1,11 @@
 package org.lic.ip.crawler;
 
+import org.lic.ip.util.IPUtil;
+
 /**
  * Created by lc on 15/1/9.
  */
-public class Data {
+public class IpData implements Comparable<IpData> {
     private String network;
 
     private String country;
@@ -85,8 +87,8 @@ public class Data {
             .append(ipAmount).toString();
     }
 
-    public Data copy() {
-        Data d = new Data();
+    public IpData copy() {
+        IpData d = new IpData();
         d.setNetwork(network);
         d.setCountry(country);
         d.setCity(city);
@@ -118,22 +120,22 @@ public class Data {
             return false;
         }
 
-        Data data = (Data) o;
+        IpData ipData = (IpData) o;
 
-        if (city != null ? !city.equals(data.city) : data.city != null) {
+        if (city != null ? !city.equals(ipData.city) : ipData.city != null) {
             return false;
         }
         if (country != null ?
-            !country.equals(data.country) :
-            data.country != null) {
+            !country.equals(ipData.country) :
+            ipData.country != null) {
             return false;
         }
-        if (isp != null ? !isp.equals(data.isp) : data.isp != null) {
+        if (isp != null ? !isp.equals(ipData.isp) : ipData.isp != null) {
             return false;
         }
         if (province != null ?
-            !province.equals(data.province) :
-            data.province != null) {
+            !province.equals(ipData.province) :
+            ipData.province != null) {
             return false;
         }
 
@@ -147,5 +149,13 @@ public class Data {
         result = 31 * result + (city != null ? city.hashCode() : 0);
         result = 31 * result + (isp != null ? isp.hashCode() : 0);
         return result;
+    }
+
+    @Override public int compareTo(IpData ipData) {
+        long startIP = IPUtil.ipString2Long(network.split("/")[0]);
+        long cIP = IPUtil.ipString2Long(ipData.network.split("/")[0]);
+        if (startIP - cIP > 0) return 1;
+        else if (startIP - cIP < 0) return -1;
+        else return 0;
     }
 }
