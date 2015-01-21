@@ -69,7 +69,7 @@ public class IPv4RadixTree {
      * @param value an arbitrary value that would be stored under a given key
      */
     public void put(long key, long mask, IpData value) {
-        long bit = MAX_IPV4_BIT;
+        long bit = 0x80000000L;  // 128.0.0.0
         int node = ROOT_PTR;
         int next = ROOT_PTR;
 
@@ -82,10 +82,6 @@ public class IPv4RadixTree {
         }
 
         if (next != NULL_PTR) {
-            //            if (node.value != NO_VALUE) {
-            //                throw new IllegalArgumentException();
-            //            }
-
             values[node] = value;
             return;
         }
@@ -93,23 +89,19 @@ public class IPv4RadixTree {
         while ((bit & mask) != 0) {
             if (size == allocatedSize)
                 expandAllocatedSize();
-
             next = size;
             values[next] = NO_VALUE;
             rights[next] = NULL_PTR;
             lefts[next] = NULL_PTR;
-
             if ((key & bit) != 0) {
                 rights[node] = next;
             } else {
                 lefts[node] = next;
             }
-
             bit >>= 1;
             node = next;
             size++;
         }
-
         values[node] = value;
     }
 
@@ -258,7 +250,13 @@ public class IPv4RadixTree {
     public void merge() throws UnknownHostException {
         Deque<IpData> mergedDeque = new ArrayDeque<IpData>();
         Deque<IpData> tmpDeque = new ArrayDeque<IpData>();
+        TreeSet<IpData> valuesTree = new TreeSet<IpData>();
         for (IpData ipData : values) {
+            if (ipData != null) {
+                valuesTree.add(ipData);
+            }
+        }
+        for (IpData ipData : valuesTree) {
             if (ipData == null) continue;
             ipData.setIpAmount(IPUtil.getAmount(ipData.getNetwork()));
             if (!tmpDeque.isEmpty()) {

@@ -112,9 +112,7 @@ public class Crawler {
             }
 
             for (IPv4Network network : availableIPs) {
-                String randomIP = IPUtil
-                    .getRandomIp(network.getCIDR().split("/")[0],
-                        network.getMasklen());
+                String randomIP = IPUtil.getRandomIp(network.getCIDR().split("/")[0],network.getMasklen());
                 IpData ipData = null;
                 System.out.println("query ip " + network.getCIDR());
                 if (ipData == null) {
@@ -168,33 +166,25 @@ public class Crawler {
                     && params[2].equals("ipv4") && !params[3].equals("*")) {
 
                     String baseIP = params[3];
-                    int prefixlen =
-                        32 - (int) (log(Integer.parseInt(params[4]), 2));
-                    String prefix = baseIP + "/" + prefixlen;
-                    IPv4Network networks;
-                    if (prefixlen > 24) {
-                        networks = new IPv4Network(baseIP + "/24");
-                    } else {
-                        networks = new IPv4Network(prefix);
-                    }
-                    int amount = 1<<(32-prefixlen);
+                    int masklen = 32 - (int) (log(Integer.parseInt(params[4]), 2));
+                    String prefix = baseIP + "/" + masklen;
+                    if (masklen > 24) masklen = 24;
+                    IPv4Network networks = new IPv4Network(prefix);
                     for (String subnet : networks.getSubnet(24)) {
                         String startIP = subnet.split("/")[0];
-                        String masklen = subnet.split("/")[1];
-                        String randomIP = IPUtil
-                            .getRandomIp(startIP, Integer.parseInt(masklen));
+                        String subMasklen = subnet.split("/")[1];
+                        String randomIP = IPUtil.getRandomIp(startIP, Integer.parseInt(subMasklen));
                         IpData ipData = null;
-                        if (ipData == null) {
-                            while (ipData == null) {
-                                try {
-                                    ipData = queryFromTaobao(randomIP);
-                                } catch (Exception e) {
-                                    logger.error(
-                                        "queryFromTaobao exception: " + e
-                                            .getMessage(), e);
-                                }
+                        while (ipData == null) {
+                            try {
+                                ipData = queryFromTaobao(randomIP);
+                            } catch (Exception e) {
+                                logger.error(
+                                    "queryFromTaobao exception: " + e
+                                        .getMessage(), e);
                             }
                         }
+                        int amount = 1<<(32 - masklen);
                         ipData.setIpAmount(amount);
                         ipData.setNetwork(subnet);
                         logger.info(ipData.toFileString());
@@ -224,12 +214,8 @@ public class Crawler {
     }
 
     private IpData queryFromTaobao(String ip) throws Exception {
-        while (!limitRate.check()) {
-            Thread.sleep(100);
-        }
-        long now = System.currentTimeMillis();
+        limitRate.check();
         String ret = HttpClientPool.getInstance().getMethod(TAOBAO_URL + "?ip=" + ip, 5000);
-        limitRate.update(now);
         if (ret == null) {
             return null;
         } else {

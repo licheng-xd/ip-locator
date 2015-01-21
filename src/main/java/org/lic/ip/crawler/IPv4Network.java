@@ -201,16 +201,16 @@ public class IPv4Network {
         return new IPRange(baseIPnumeric, endIP, getCIDR());
     }
 
-    public List<String> getSubnet(int cdir) {
-        if (cdir > 32 || cdir < 8 || cdir < numericCIDR) {
-            throw new NumberFormatException("CIDR can not be greater than 32");
+    public List<String> getSubnet(int masklen) {
+        if (masklen > 32 || masklen < 8 || masklen < numericCIDR) {
+            throw new NumberFormatException("masklen can not be greater than 32");
         }
-        int numberOfIPs = (int) Math.pow(2, 32 - cdir);
-        Long baseIP = baseIPnumeric & netmaskNumeric;
+        int numberOfIPs = 1 << (32 - masklen);
+        Long startIP = baseIPnumeric & netmaskNumeric;
         List<String> list = new ArrayList<String>();
-        for (int i=0; i<Math.pow(2, cdir-numericCIDR); i++) {
-            String subnet = IPUtil.ipLong2String(baseIP) + "/" + cdir;
-            baseIP += numberOfIPs;
+        for (int i=0; i<Math.pow(2, masklen-numericCIDR); i++) {
+            String subnet = IPUtil.ipLong2String(startIP) + "/" + masklen;
+            startIP += numberOfIPs;
             list.add(subnet);
         }
         return list;

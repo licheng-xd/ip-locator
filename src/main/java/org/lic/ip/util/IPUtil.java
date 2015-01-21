@@ -249,8 +249,8 @@ public class IPUtil {
 //        }
 //        System.out.println(mergeCidrs(cidrs));
         //System.out.println(getSmallestMasklen(1024));
-        System.out.println(convertIntIpToString(704643072));
-        System.out.println(ipString2Long("168.209.0.0"));
+        //System.out.println(ipLong2String(0x80000000L));
+        System.out.println(ipString2Long("255.255.255.255"));
 //        int ip = 704643072;
 //        ip &= -(1<<(32-19));
 //        System.out.println(ip);
